@@ -1,5 +1,6 @@
 export type ProjectId = string & {readonly __brand: 'ProjectId'};
 export type StageRunId = string & {readonly __brand: 'StageRunId'};
+export type AssetId = string & {readonly __brand: 'AssetId'};
 
 export type ProjectRecord = {
   readonly schemaVersion: 1;
@@ -142,4 +143,33 @@ export type CaptionTiming = {
 export type CaptionAlignmentResult = {
   readonly timings: readonly CaptionTiming[];
   readonly metadata: CapabilityProviderMetadata;
+};
+
+export type AssetKind = string;
+export type AssetOrigin = 'generated' | 'source';
+
+export type AssetLineageDependency = {
+  readonly kind: string;
+  readonly identity: string;
+};
+
+export type AssetGenerationProvenance = {
+  readonly provider: string;
+  readonly model: string;
+  readonly generationParameters: Readonly<Record<string, unknown>>;
+};
+
+export type AssetRecord = {
+  readonly schemaVersion: 1;
+  readonly id: AssetId;
+  readonly kind: AssetKind;
+  readonly origin: AssetOrigin;
+  readonly contentHash: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly localPath: string;
+  readonly mimeType: string;
+  readonly cacheKey?: string;
+  readonly provenance?: AssetGenerationProvenance;
+  readonly lineage: readonly AssetLineageDependency[];
 };
