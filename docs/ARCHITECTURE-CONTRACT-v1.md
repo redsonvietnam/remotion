@@ -77,6 +77,8 @@ The minimum conceptual entities are:
 
 A `Timeline` is the canonical runtime representation of a video plan. It contains typed tracks and timed clips.
 
+A timeline MAY contain unresolved asset references during authoring/compilation. Resolution is a distinct stage. A `RenderSnapshot` MUST NOT be created while any required clip, asset, or render input remains unresolved.
+
 Typical tracks include:
 
 - visual
@@ -86,7 +88,7 @@ Typical tracks include:
 - effects
 - text/overlay where required by the template
 
-Each clip must resolve to a deterministic time interval and a local/resolved asset or pure render data.
+Each clip must resolve to a deterministic time interval and a local/resolved asset or pure render data before snapshot creation.
 
 Music and SFX are part of the domain model even if their generation providers are implemented later.
 
@@ -105,6 +107,7 @@ A template may declare:
 - typography requirements
 - transition/effect capabilities
 - optional voice-profile hints
+- `styleOverrides` for fields the template explicitly locks
 
 Adding a template must not require changing the core generation pipeline.
 
@@ -126,7 +129,22 @@ A style may define:
 
 A style must not perform article extraction, script generation, TTS, or image generation.
 
-Changing only a style should invalidate neither upstream content nor generated assets; it should require snapshot resolution/rendering only unless a template-specific constraint proves otherwise.
+Changing only a style should invalidate neither upstream content nor generated assets; it should require snapshot resolution/rendering only.
+
+### 7.1 Template/Style precedence
+
+Presentation conflicts use deterministic, field-level precedence. The most-specific applicable value wins:
+
+```text
+Content/Clip explicit override
+  > Template.styleOverrides (locked fields)
+  > Style.tokens
+  > Template defaults
+```
+
+`RenderProfile` is orthogonal to this precedence. It owns output mechanics such as resolution, FPS, and codec/container; it is not a design-token source.
+
+Content/Clip overrides may not override a template-locked field. Style controls every token category the template does not lock. This resolution algorithm is a pure function over the applicable template, style, profile, and clip/content values.
 
 ## 8. AI capability contract
 
@@ -147,7 +165,9 @@ Image generation requests must be explicit, persistable, and cacheable.
 
 An asset cache key should be based on normalized generation inputs and relevant provider/model/parameter identity. The exact canonicalization algorithm is an implementation task, but it must prevent accidental reuse across materially different requests.
 
-The asset record must preserve provenance such as provider, model, normalized request parameters, content hash, dimensions, and local path.
+The asset record must preserve provenance such as provider, model, normalized request parameters, content hash, dimensions, local path, and lineage/dependency identity.
+
+For generated assets, provider/model identity and material generation parameters are required provenance, not optional metadata. Asset lineage MUST identify the upstream inputs whose changes invalidate the asset.
 
 A failed render must not force successful image generation to run again.
 
@@ -175,7 +195,9 @@ Primary timing strategy:
 
 1. Use provider word timings when available as an optimization.
 2. Otherwise use a dedicated `CaptionAlignmentCapability` over `(audio, normalized transcript, language)`.
-3. Proportional duration/word-count splitting is not an acceptable shipped timing strategy; it may exist only as an explicitly marked fixture/dev fallback.
+3. Proportional duration/word-count splitting is not an acceptable production strategy.
+
+If caption alignment is required and the selected/provider timing source is unavailable or fails, the `captionAlign` stage MUST fail explicitly. The system MUST NOT silently publish degraded/proportional timing. The failure is represented as a normal retryable `StageRun` failure.
 
 `CaptionTrack` contains timing/text data. `CaptionStyleSpec` controls typography and animation at render time.
 
@@ -187,7 +209,7 @@ System fonts are not a rendering dependency.
 
 Fonts used by shipped templates/styles must be bundled, licensed appropriately, and explicitly loaded before frame rendering.
 
-The exact primary font family is intentionally not frozen by this contract. WS2 must evaluate candidates such as Be Vietnam Pro and Noto Sans against:
+The exact primary font family is intentionally not frozen by this contract. WS3 must evaluate candidates such as Be Vietnam Pro and Noto Sans against:
 
 - Vietnamese Unicode coverage, including combining marks
 - available weights
@@ -257,13 +279,14 @@ The Remotion composition's dynamic input is a `RenderSnapshot`, plus static temp
 
 The renderer must have zero runtime network dependency.
 
+Renderer isolation MUST be machine-checkable. The project will enforce a static dependency-graph rule preventing renderer modules from importing provider, CLI, secret/config-loading, or other mutable pipeline modules. This rule is a CI quality gate, not merely a review convention. A dependency-graph tool such as `dependency-cruiser`, or an equivalent existing ESLint import-boundary rule, may implement the check.
+
 ## 16. Render profiles
 
 The initial profile is:
 
 - 1080x1920
 - 30 FPS
-- vertical short-form
 
 The architecture must support future profiles such as 1920x1080 and 1080x1080 without rewriting the timeline/domain model.
 
@@ -355,6 +378,7 @@ Fast PR validation should include:
 - unit/contract tests
 - deterministic fixture tests
 - Remotion bundle
+- renderer dependency-boundary check
 
 A render smoke test may be included if runtime remains acceptable. Expensive/live-provider validation is not part of the normal PR gate.
 
@@ -369,6 +393,10 @@ Do not commit:
 - generated render outputs
 - disposable caches
 - large generated AI media unless explicitly designated as a small test fixture
+
+Obsolete architecture and roadmap documents MUST NOT remain as competing sources of truth. The canonical architecture documents are `docs/ARCHITECTURE-CONTRACT-v1.md`, `docs/ADR-001-video-factory-boundaries.md`, and `docs/IMPLEMENTATION-PLAN-v1.md`.
+
+The superseded scene-centric draft has been quarantined under `src/domain/legacy/authoring-draft.ts` and MUST NOT be imported by the active implementation.
 
 ## 24. Implementation sequence
 
@@ -451,14 +479,31 @@ Architecture v1 is considered implemented only when:
 9. Caption timing data is independent of caption visual style.
 10. No secret is present in persisted project state or renderer input.
 11. CI can exercise the complete fixture render path without live AI credentials.
+12. CI can machine-check renderer dependency isolation.
+13. Required caption alignment failure is surfaced as a retryable stage failure rather than degraded production timing.
+14. Template/Style precedence is deterministic and testable.
 
-## 27. Source and review note
+## 27. Architecture review decisions incorporated
 
-This contract incorporates the reviewed Claude architecture proposal, while explicitly resolving the following project decisions:
+The follow-up architecture review resolved the remaining pre-implementation questions:
+
+1. The obsolete `VideoPlan`/`ScenePlan` runtime draft is quarantined rather than deleted outright so useful shape references remain available historically, but it is non-authoritative and non-importable by active implementation.
+2. The obsolete `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` are deleted so they cannot compete with the canonical contract.
+3. Template/Style precedence is field-level and deterministic: Content/Clip explicit override > Template locked `styleOverrides` > Style tokens > Template defaults. `RenderProfile` is orthogonal.
+4. Required caption alignment failure is a hard, retryable stage failure; proportional/degraded timing is not production behavior.
+5. Renderer isolation is enforced by a machine-checkable static dependency-boundary rule in CI.
+
+Implementation MUST NOT begin by implementing Timeline/Track/Clip in the quarantined legacy file. The real domain contracts belong to the planned WS1/WS4 workstreams.
+
+## 28. Source and review note
+
+This contract incorporates the reviewed Claude architecture proposal and subsequent independent follow-up decisions, while explicitly resolving the following project decisions:
 
 - multi-template/multi-style rendering is first-class
 - music/SFX are represented in the domain even if generation providers are deferred
 - font fallback is controlled/bundled rather than implicitly system-resolved
 - the ledger remains authoritative for pipeline state
+- required caption alignment failures are explicit and retryable
+- renderer/provider separation is machine-enforced
 
 Implementation should not silently weaken these invariants. Any architectural change must be recorded as an ADR before dependent work proceeds.
