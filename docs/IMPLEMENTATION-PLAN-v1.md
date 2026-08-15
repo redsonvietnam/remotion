@@ -17,6 +17,7 @@ Acceptance:
 - contracts compile
 - invalid persisted state is rejected
 - no secret fields exist in persisted domain models
+- the obsolete scene-centric draft is not imported by active implementation
 
 ## WS2 — Asset Store + Lineage
 
@@ -32,6 +33,7 @@ Acceptance:
 - identical resolved generation requests reuse assets
 - changed dependencies invalidate only affected assets
 - force regeneration bypasses matching cache
+- material generation parameters and provider/model identity are required provenance
 
 ## WS3 — Vietnamese Typography + Text Layout
 
@@ -47,6 +49,7 @@ Acceptance:
 - Vietnamese fixture matrix passes in Remotion render environment
 - missing glyph requirements fail before rendering
 - no implicit system-font dependency exists in shipped rendering path
+- text normalization/layout is deterministic and independently testable
 
 ## WS4 — Timeline + Compiler
 
@@ -60,21 +63,38 @@ Deliver:
 
 Acceptance:
 - identical ContentPlan + configuration produces identical Timeline
+- unresolved asset references are allowed before resolution
 - overlapping/invalid clip constraints are rejected
+- Timeline/Track/Clip is independent of the quarantined legacy draft
 
 ## WS5 — Template + Style Registry
+
+Dependencies:
+- WS3 typography contracts
+- WS4 timeline contracts
+- WS1 foundation
 
 Deliver:
 - TemplateDefinition
 - StyleDefinition
 - registry/discovery
 - compatibility validation
+- deterministic template/style precedence
 - initial fixture templates/styles
 
 Acceptance:
 - a content plan can resolve to multiple template/style combinations without changing upstream content
+- precedence is deterministic: Content/Clip override > Template locked styleOverrides > Style tokens > Template defaults
+- RenderProfile remains orthogonal to design-token precedence
 
 ## WS6 — Render Snapshot + Renderer Boundary
+
+Dependencies:
+- WS2 asset/lineage
+- WS3 typography
+- WS4 timeline
+- WS5 template/style
+- WS1 foundation
 
 Deliver:
 - snapshot resolver
@@ -82,11 +102,13 @@ Deliver:
 - snapshot identity/deduplication
 - Remotion composition input boundary
 - static/local-only renderer enforcement
+- machine-checkable renderer dependency boundary
 
 Acceptance:
 - unresolved assets prevent snapshot creation
 - snapshot render requires no provider/network dependency
 - fixture snapshot renders to MP4
+- CI statically rejects renderer imports of provider/CLI/secret/config/mutable pipeline modules
 
 ## WS7 — Fake Providers
 
@@ -94,12 +116,16 @@ Deliver deterministic fake implementations for:
 - text generation
 - image generation
 - TTS
-- optional caption alignment
+- caption alignment
 
 Acceptance:
 - complete generation pipeline runs in CI without external credentials
+- caption alignment failure is represented as a retryable StageRun failure
 
 ## WS8 — Google AI Providers
+
+Dependencies:
+- WS7 capability/fake-provider contracts
 
 Deliver:
 - Google image adapter
@@ -114,6 +140,12 @@ Acceptance:
 
 ## WS9 — Caption Alignment
 
+Dependencies:
+- WS1 foundation
+- WS3 Vietnamese text normalization
+- WS7 fake capability contract
+- WS8 when using a live provider/alignment implementation
+
 Deliver:
 - CaptionAlignmentCapability
 - Vietnamese-capable forced-alignment implementation evaluation
@@ -122,7 +154,8 @@ Deliver:
 
 Acceptance:
 - captions are timing data independent of visual style
-- production path never uses proportional word timing
+- production path never uses proportional/degraded word timing
+- required alignment failure produces a retryable `captionAlign` StageRun failure
 
 ## WS10 — Content / URL Ingestion
 
@@ -140,6 +173,12 @@ Acceptance:
 
 ## WS11 — Content / Script Pipeline
 
+Dependencies:
+- WS1 foundation
+- WS4 timeline contract
+- WS7 fake text provider
+- WS10 ingestion where URL/topic extraction is used
+
 Deliver:
 - ContentPlan generation
 - scene intents
@@ -149,6 +188,7 @@ Deliver:
 
 Acceptance:
 - provider-independent structured ContentPlan is produced
+- authoring scene intents do not become the renderer runtime model
 
 ## WS12 — CLI
 
@@ -188,6 +228,7 @@ Deliver:
 - caption fixtures
 - template/style compatibility fixtures
 - full local fixture render
+- renderer dependency-boundary tests
 
 Acceptance:
 - CI can execute complete fixture pipeline without live AI
@@ -211,35 +252,31 @@ Acceptance:
 ## Dependency graph
 
 ```text
-WS1 Foundation
-  ├── WS2 Asset/Lineage
-  ├── WS3 Typography
-  ├── WS7 Fake Providers
-  └── WS4 Timeline
-          └── WS5 Template/Style
-                  └── WS6 RenderSnapshot/Renderer
+                         ┌── WS2 Asset/Lineage ─────────────┐
+                         │                                   │
+                         ├── WS3 Typography ────────┐       │
+                         │                           │       │
+WS1 Foundation ──────────┼── WS4 Timeline ──────────┼── WS5 Template/Style
+                         │                           │       │
+                         └── WS7 Fake Providers     │       │
+                                                     └───────┼── WS6 RenderSnapshot
+                                                             │
+WS7 + WS4 + WS10 ──────────────── WS11 Content Pipeline ────┘
 
-WS7 Fake Providers + WS4 Timeline
-          └── WS11 Content Pipeline
+WS7 + WS8 + WS9 ──────────────── full generation capabilities
 
-WS7 + WS8 + WS9
-          └── full generation pipeline
+WS6 + WS7 ────────────────────── WS14 Fixture/Render tests
 
-WS10 URL Ingestion
-          └── WS11 Content Pipeline
+WS11 + WS5 + WS6 ─────────────── WS12 CLI
 
-WS6 + WS7
-          └── WS14 Fixture/Render tests
+WS5 + WS8 + WS9 + WS10 + WS11 + WS12 ── WS13 Production catalog
 
-WS11 + WS5 + WS6
-          └── WS12 CLI
-
-WS5 + WS8 + WS9 + WS10 + WS11 + WS12
-          └── WS13 Production catalog
-
-WS1-WS14
-          └── WS15 Documentation/DX
+WS1-WS14 ─────────────────────── WS15 Documentation/DX
 ```
+
+### Parallelization rule
+
+Workstreams may run in parallel only when their explicit dependencies are satisfied and their scopes do not create an unowned shared-file conflict. R1 owns the dependency/scope decision; C1/C2 do not self-assign parallel work.
 
 ## Delivery rule
 
