@@ -8,7 +8,7 @@ A reusable, production-oriented starting point for vertical short-form videos bu
 - Data-driven scenes: edit content in `src/data/default-video.ts` instead of rewriting the composition.
 - Reusable animation primitives driven by Remotion's frame timeline.
 - Intro → content scenes → outro structure.
-- Optional local image assets from `public/assets/`.
+- Local image, video, and background-audio slots.
 - TypeScript, ESLint, Prettier, Vitest, and GitHub Actions from the first commit.
 - Exact Remotion package versions to keep the toolchain aligned.
 
@@ -34,7 +34,7 @@ For the normal workflow, change only the content layer first:
 src/data/default-video.ts
 ```
 
-Each scene has:
+Each scene supports:
 
 ```ts
 {
@@ -43,7 +43,14 @@ Each scene has:
   body: 'Optional supporting copy',
   durationInSeconds: 5,
   image: 'assets/example.jpg',
+  video: 'assets/example.mp4',
 }
+```
+
+Use either `image` or `video` for a scene background. Add optional background music with:
+
+```ts
+backgroundAudio: 'assets/music.mp3'
 ```
 
 Add local media under:
@@ -51,8 +58,6 @@ Add local media under:
 ```text
 public/assets/
 ```
-
-Then reference it with the relative path used by `image`.
 
 The visual system stays in `src/components/` and `src/compositions/` so content changes do not require layout rewrites.
 
