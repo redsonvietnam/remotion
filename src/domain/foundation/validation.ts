@@ -15,6 +15,12 @@ import type {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean => {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+};
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
@@ -23,6 +29,22 @@ const isIsoDate = (value: unknown): value is string =>
 
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value > 0;
+
+const PROJECT_RECORD_KEYS = ['schemaVersion', 'id', 'name', 'createdAt'] as const;
+const STAGE_RUN_RECORD_KEYS = [
+  'schemaVersion',
+  'id',
+  'projectId',
+  'stage',
+  'status',
+  'attempt',
+  'startedAt',
+  'finishedAt',
+  'inputHash',
+  'outputHash',
+  'errorCode',
+  'dependencyRunIds',
+] as const;
 
 const isProjectConfig = (value: unknown): value is ProjectConfig => {
   if (!isRecord(value)) return false;
@@ -39,6 +61,7 @@ const isProjectConfig = (value: unknown): value is ProjectConfig => {
 
 export const isProjectRecord = (value: unknown): value is ProjectRecord =>
   isRecord(value) &&
+  hasExactKeys(value, PROJECT_RECORD_KEYS) &&
   value.schemaVersion === 1 &&
   isNonEmptyString(value.id) &&
   isNonEmptyString(value.name) &&
@@ -50,7 +73,7 @@ export const parseProjectRecord = (value: unknown): ProjectRecord => {
 };
 
 export const isStageRunRecord = (value: unknown): value is StageRunRecord => {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !hasExactKeys(value, STAGE_RUN_RECORD_KEYS)) return false;
   const validStatus = value.status === 'running' || value.status === 'succeeded' || value.status === 'failed';
   const validStage = [
     'content',
@@ -62,7 +85,7 @@ export const isStageRunRecord = (value: unknown): value is StageRunRecord => {
     'snapshot',
     'render',
   ].includes(String(value.stage));
-  return (
+  const baseValid =
     value.schemaVersion === 1 &&
     isNonEmptyString(value.id) &&
     isNonEmptyString(value.projectId) &&
@@ -75,8 +98,19 @@ export const isStageRunRecord = (value: unknown): value is StageRunRecord => {
     (value.outputHash === undefined || isNonEmptyString(value.outputHash)) &&
     (value.errorCode === undefined || isNonEmptyString(value.errorCode)) &&
     Array.isArray(value.dependencyRunIds) &&
-    value.dependencyRunIds.every(isNonEmptyString)
-  );
+    value.dependencyRunIds.every(isNonEmptyString);
+
+  if (!baseValid) return false;
+
+  if (value.status === 'running') {
+    return value.finishedAt === undefined && value.outputHash === undefined && value.errorCode === undefined;
+  }
+
+  if (value.status === 'succeeded') {
+    return value.finishedAt !== undefined && value.errorCode === undefined;
+  }
+
+  return value.finishedAt !== undefined && value.errorCode !== undefined && value.outputHash === undefined;
 };
 
 export const parseStageRunRecord = (value: unknown): StageRunRecord => {
