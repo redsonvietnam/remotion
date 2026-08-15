@@ -1,3 +1,5 @@
+export * from './asset-store';
+export * from './assets';
 export * from './capabilities';
 export * from './config';
 export * from './ids';
