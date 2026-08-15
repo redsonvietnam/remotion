@@ -106,10 +106,21 @@ export const findCachedAsset = async (
   const normalized = normalizeAssetRequest(request);
   for (const fileName of entries) {
     if (!fileName.startsWith(`${assetId}.`) || fileName.endsWith('.meta.json')) continue;
-    const assetPath = resolveProjectPath(projectRoot, projectId, `assets/${fileName}`);
+    let assetPath: string;
+    try {
+      assetPath = resolveProjectPath(projectRoot, projectId, `assets/${fileName}`);
+    } catch {
+      continue;
+    }
+    const expectedLocalPath = `assets/${fileName}`;
     const metadata = await readValidMetadata(metadataPathFor(assetPath));
     if (!metadata || metadata.origin !== 'generated' || metadata.cacheKey !== cacheKey) continue;
-    if (metadata.id !== assetId || !metadata.provenance) continue;
+    if (metadata.id !== assetId || metadata.localPath !== expectedLocalPath || !metadata.provenance) continue;
+    try {
+      resolveProjectPath(projectRoot, projectId, metadata.localPath);
+    } catch {
+      continue;
+    }
     if (metadata.provenance.provider !== request.provider || metadata.provenance.model !== request.model) continue;
     if (stableJson(metadata.provenance.generationParameters) !== stableJson(normalized.generationParameters)) continue;
     if (stableJson(metadata.lineage) !== stableJson(normalized.lineage)) continue;
