@@ -178,6 +178,48 @@ describe('foundation', () => {
     expect((await findCachedAsset(root, projectId, request)).hit).toBe(false);
   });
 
+  it('treats matching metadata.localPath as a valid cache hit', async () => {
+    const {root, projectId} = await makeTempProject();
+    const request = makeRequest();
+    const asset = await storeGeneratedAsset(root, projectId, {request, data: new TextEncoder().encode('asset')});
+
+    expect((await findCachedAsset(root, projectId, request)).hit).toBe(true);
+    expect((await findCachedAsset(root, projectId, request)).asset?.localPath).toBe(asset.localPath);
+  });
+
+  it('rejects metadata.localPath pointing to another asset', async () => {
+    const {root, projectId} = await makeTempProject();
+    const request = makeRequest();
+    const asset = await storeGeneratedAsset(root, projectId, {request, data: new TextEncoder().encode('asset')});
+    const metadataPath = assetMetadataPath(root, projectId, asset);
+    const metadata = JSON.parse(await readFile(metadataPath, 'utf8')) as AssetRecord;
+    await writeFile(metadataPath, metadataJson({...metadata, localPath: 'assets/another.png'}));
+
+    expect((await findCachedAsset(root, projectId, request)).hit).toBe(false);
+  });
+
+  it('rejects traversal metadata.localPath as a cache hit', async () => {
+    const {root, projectId} = await makeTempProject();
+    const request = makeRequest();
+    const asset = await storeGeneratedAsset(root, projectId, {request, data: new TextEncoder().encode('asset')});
+    const metadataPath = assetMetadataPath(root, projectId, asset);
+    const metadata = JSON.parse(await readFile(metadataPath, 'utf8')) as AssetRecord;
+    await writeFile(metadataPath, metadataJson({...metadata, localPath: 'assets/../outside.png'}));
+
+    expect((await findCachedAsset(root, projectId, request)).hit).toBe(false);
+  });
+
+  it('rejects absolute metadata.localPath as a cache hit', async () => {
+    const {root, projectId} = await makeTempProject();
+    const request = makeRequest();
+    const asset = await storeGeneratedAsset(root, projectId, {request, data: new TextEncoder().encode('asset')});
+    const metadataPath = assetMetadataPath(root, projectId, asset);
+    const metadata = JSON.parse(await readFile(metadataPath, 'utf8')) as AssetRecord;
+    await writeFile(metadataPath, metadataJson({...metadata, localPath: '/outside.png'}));
+
+    expect((await findCachedAsset(root, projectId, request)).hit).toBe(false);
+  });
+
   it('keeps asset storage inside the project asset boundary', async () => {
     const {root, projectId} = await makeTempProject();
     const fakeAsset = {
