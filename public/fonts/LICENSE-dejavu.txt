@@ -1,0 +1,15 @@
+DejaVu Sans — bundled Vietnamese subset
+
+Source: https://dejavu-fonts.github.io/
+License: Bitstream Vera / DejaVu font license
+
+Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved.
+DejaVu changes are in the public domain.
+
+Permission is granted, free of charge, to use, copy, merge, publish,
+distribute, and/or sell the Font Software and to permit persons to whom
+the Font Software is furnished to do so, subject to inclusion of this
+license and copyright notice. Modified fonts must not use the names
+"Bitstream" or "Vera".
+
+The Font Software is provided "as is", without warranty of any kind.
