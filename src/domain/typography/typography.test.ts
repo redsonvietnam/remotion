@@ -35,7 +35,7 @@ describe('Vietnamese typography', () => {
 
   it('validates the representative Vietnamese glyph matrix', () => {
     validateVietnameseFont(VIETNAMESE_FONT_MANIFEST);
-    validateGlyphCoverage('Việt Nam — Nghị quyết 57 — Công nghệ thông tin — Chuyển đổi số — Đắk Nông — Nâm Nung', VIETNAMESE_FONT_MANIFEST);
+    validateGlyphCoverage('Việt Nam - Nghị quyết 57 - Công nghệ thông tin - Chuyển đổi số - Đắk Nông - Nâm Nung', VIETNAMESE_FONT_MANIFEST);
   });
 
   it('normalizes precomposed and decomposed Vietnamese text to the same identity', () => {
