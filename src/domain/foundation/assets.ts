@@ -48,6 +48,7 @@ export const createGeneratedAssetId = (request: GeneratedAssetRequest): AssetId 
 export const createGeneratedAssetRecord = (input: {
   readonly request: GeneratedAssetRequest;
   readonly contentHash: string;
+  readonly localPath: string;
 }): AssetRecord => ({
   schemaVersion: 1,
   id: createGeneratedAssetId(input.request),
@@ -56,7 +57,7 @@ export const createGeneratedAssetRecord = (input: {
   contentHash: input.contentHash,
   ...(input.request.width === undefined ? {} : {width: input.request.width}),
   ...(input.request.height === undefined ? {} : {height: input.request.height}),
-  localPath: '',
+  localPath: input.localPath,
   mimeType: input.request.mimeType,
   cacheKey: createAssetCacheKey(input.request),
   provenance: {
