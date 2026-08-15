@@ -4,6 +4,7 @@ export type Scene = {
   body?: string;
   durationInSeconds: number;
   image?: string;
+  video?: string;
 };
 
 export type VideoTheme = {
@@ -18,5 +19,6 @@ export type VideoContent = {
   hook: string;
   scenes: Scene[];
   outro: string;
+  backgroundAudio?: string;
   theme: VideoTheme;
 };
