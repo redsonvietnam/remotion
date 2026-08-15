@@ -1,3 +1,5 @@
+import {ESLint} from 'eslint';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import {createGeneratedAssetRecord} from '../domain/foundation/assets';
 import {createStyle, createTemplate} from '../domain/templates/templates';
@@ -29,6 +31,17 @@ const snapshot = () => resolveRenderSnapshot({
   verifyAsset: () => true,
 });
 
+const rendererBoundary = new ESLint({
+  overrideConfigFile: fileURLToPath(new URL('../../eslint.renderer.config.mjs', import.meta.url)),
+});
+
+const lintNestedRendererImport = async (importPath: string) => {
+  const results = await rendererBoundary.lintText(`import value from '${importPath}';`, {
+    filePath: fileURLToPath(new URL('./deep/nested/runtime/fixture.ts', import.meta.url)),
+  });
+  return results[0].messages;
+};
+
 describe('WS6 renderer boundary', () => {
   it('accepts only a complete RenderSnapshot as renderer input', async () => {
     const resolved = await snapshot();
@@ -41,5 +54,29 @@ describe('WS6 renderer boundary', () => {
     expect(source).toMatch(/RenderSnapshot/);
     expect(source).not.toMatch(/from ['\"](?:remotion|@remotion\//);
     expect(source).not.toMatch(/providers|cli|config|pipeline/);
+  });
+
+  it('rejects forbidden imports at arbitrary renderer nesting depth', async () => {
+    const cases = [
+      ['../../../../../../providers/client', 'provider modules'],
+      ['../../../../../../cli/command', 'CLI modules'],
+      ['../../../../../../domain/foundation/config', 'configuration modules'],
+      ['../../../../../../domain/secrets/token-loader', 'secret-loading modules'],
+      ['../../../../../../domain/pipeline/state', 'pipeline modules'],
+      ['../../../../../../domain/foundation/project', 'project-state modules'],
+      ['../../../../../../domain/foundation/asset-store', 'asset-store modules'],
+      ['../../../../../../domain/foundation/stage-run', 'stage-run modules'],
+    ] as const;
+
+    for (const [importPath, category] of cases) {
+      const messages = await lintNestedRendererImport(importPath);
+      expect(messages.some((message) => message.severity === 2 && message.message.includes('Renderer must not import')), importPath).toBe(true);
+      expect(messages.some((message) => message.message.includes(category)), importPath).toBe(true);
+    }
+  });
+
+  it('allows legitimate renderer imports into the domain regardless of nesting depth', async () => {
+    const messages = await lintNestedRendererImport('../../../../../../domain/timeline/timeline');
+    expect(messages.filter((message) => message.severity === 2)).toEqual([]);
   });
 });
