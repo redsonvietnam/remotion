@@ -1,4 +1,7 @@
 import type {
+  AssetRecord,
+  AssetGenerationProvenance,
+  AssetLineageDependency,
   CaptionAlignmentRequest,
   CaptionAlignmentResult,
   ImageGenerationRequest,
@@ -20,6 +23,9 @@ const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]): 
   const expected = [...keys].sort();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 };
+
+const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(value).every((key) => keys.includes(key));
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
@@ -45,6 +51,29 @@ const STAGE_RUN_RECORD_KEYS = [
   'errorCode',
   'dependencyRunIds',
 ] as const;
+const ASSET_RECORD_KEYS = [
+  'schemaVersion',
+  'id',
+  'kind',
+  'origin',
+  'contentHash',
+  'width',
+  'height',
+  'localPath',
+  'mimeType',
+  'cacheKey',
+  'provenance',
+  'lineage',
+] as const;
+const ASSET_PROVENANCE_KEYS = ['provider', 'model', 'generationParameters'] as const;
+const ASSET_LINEAGE_KEYS = ['kind', 'identity'] as const;
+const SECRET_KEY_PATTERN = /(?:api[_-]?key|access[_-]?token|auth(?:orization)?|bearer|credential|password|secret|private[_-]?key)/i;
+
+const containsSecretKey = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some(containsSecretKey);
+  if (!isRecord(value)) return false;
+  return Object.entries(value).some(([key, entry]) => SECRET_KEY_PATTERN.test(key) || containsSecretKey(entry));
+};
 
 const isProjectConfig = (value: unknown): value is ProjectConfig => {
   if (!isRecord(value)) return false;
@@ -101,20 +130,53 @@ export const isStageRunRecord = (value: unknown): value is StageRunRecord => {
     value.dependencyRunIds.every(isNonEmptyString);
 
   if (!baseValid) return false;
-
   if (value.status === 'running') {
     return value.finishedAt === undefined && value.outputHash === undefined && value.errorCode === undefined;
   }
-
   if (value.status === 'succeeded') {
     return value.finishedAt !== undefined && value.errorCode === undefined;
   }
-
   return value.finishedAt !== undefined && value.errorCode !== undefined && value.outputHash === undefined;
 };
 
 export const parseStageRunRecord = (value: unknown): StageRunRecord => {
   if (!isStageRunRecord(value)) throw new Error('Invalid persisted StageRun record');
+  return value;
+};
+
+const isAssetLineageDependency = (value: unknown): value is AssetLineageDependency =>
+  isRecord(value) &&
+  hasExactKeys(value, ASSET_LINEAGE_KEYS) &&
+  isNonEmptyString(value.kind) &&
+  isNonEmptyString(value.identity);
+
+const isAssetGenerationProvenance = (value: unknown): value is AssetGenerationProvenance =>
+  isRecord(value) &&
+  hasExactKeys(value, ASSET_PROVENANCE_KEYS) &&
+  isNonEmptyString(value.provider) &&
+  isNonEmptyString(value.model) &&
+  isRecord(value.generationParameters) &&
+  !containsSecretKey(value.generationParameters);
+
+export const isAssetRecord = (value: unknown): value is AssetRecord => {
+  if (!isRecord(value) || !hasOnlyKeys(value, ASSET_RECORD_KEYS)) return false;
+  if (value.schemaVersion !== 1 || !isNonEmptyString(value.id) || !isNonEmptyString(value.kind)) return false;
+  if (value.origin !== 'generated' && value.origin !== 'source') return false;
+  if (!isNonEmptyString(value.contentHash) || !isNonEmptyString(value.localPath) || !isNonEmptyString(value.mimeType)) return false;
+  if (value.width !== undefined && !isPositiveInteger(value.width)) return false;
+  if (value.height !== undefined && !isPositiveInteger(value.height)) return false;
+  if (!Array.isArray(value.lineage) || !value.lineage.every(isAssetLineageDependency)) return false;
+  if (containsSecretKey(value)) return false;
+
+  if (value.origin === 'generated') {
+    return isNonEmptyString(value.cacheKey) && isAssetGenerationProvenance(value.provenance);
+  }
+
+  return value.cacheKey === undefined && value.provenance === undefined;
+};
+
+export const parseAssetRecord = (value: unknown): AssetRecord => {
+  if (!isAssetRecord(value)) throw new Error('Invalid persisted asset record');
   return value;
 };
 
