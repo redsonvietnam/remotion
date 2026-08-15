@@ -20,6 +20,10 @@ export type AssetCacheIdentity = {
   readonly model: string;
   readonly generationParameters: Readonly<Record<string, unknown>>;
   readonly lineage: readonly AssetLineageDependency[];
+  readonly mimeType: string;
+  readonly extension: string;
+  readonly width?: number;
+  readonly height?: number;
 };
 
 const normalizeJsonObject = <T extends Readonly<Record<string, unknown>>>(value: T): T =>
@@ -37,6 +41,10 @@ export const normalizeAssetRequest = (request: GeneratedAssetRequest): AssetCach
   model: request.model,
   generationParameters: normalizeJsonObject(request.generationParameters),
   lineage: normalizeLineage(request.lineage),
+  mimeType: request.mimeType,
+  extension: request.extension.replace(/^\./, ''),
+  ...(request.width === undefined ? {} : {width: request.width}),
+  ...(request.height === undefined ? {} : {height: request.height}),
 });
 
 export const createAssetCacheKey = (request: GeneratedAssetRequest): string =>
