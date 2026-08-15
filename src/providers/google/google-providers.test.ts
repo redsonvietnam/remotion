@@ -7,14 +7,6 @@ import {createGoogleImageProvider, createGoogleSpeechProvider, createGoogleTextP
 const response = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {status, headers: {'content-type': 'application/json'}});
 
-const png = (): Uint8Array => {
-  const bytes = new Uint8Array(24);
-  bytes.set([0x89, 0x50, 0x4e, 0x47], 0);
-  new DataView(bytes.buffer).setUint32(16, 1080);
-  new DataView(bytes.buffer).setUint32(20, 1920);
-  return bytes;
-};
-
 describe('Google providers', () => {
   const config = loadGoogleProviderConfig({
     GEMINI_API_KEY: 'secret-test-key',
@@ -25,6 +17,14 @@ describe('Google providers', () => {
     GEMINI_ASSET_DIRECTORY: 'assets/google',
     GEMINI_API_BASE_URL: 'https://example.test/v1beta',
   });
+
+  const png = (): Uint8Array => {
+    const bytes = new Uint8Array(24);
+    bytes.set([0x89, 0x50, 0x4e, 0x47], 0);
+    new DataView(bytes.buffer).setUint32(16, 1080);
+    new DataView(bytes.buffer).setUint32(20, 1920);
+    return bytes;
+  };
 
   it('loads configuration from environment without changing persisted domain config', () => {
     expect(config.apiKey).toBe('secret-test-key');
@@ -52,12 +52,41 @@ describe('Google providers', () => {
     expect(result.localPath).toMatch(/^assets\/google\/google-image_[0-9a-f]{24}\.png$/u);
   });
 
-  it('converts Google PCM speech output to deterministic WAV metadata', async () => {
+  it('preserves Google speech provenance and validates the supported PCM contract', async () => {
     const pcm = new Uint8Array(48000);
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(response({candidates: [{content: {parts: [{inlineData: {data: Buffer.from(pcm).toString('base64'), mimeType: 'audio/L16;rate=24000'}}]}}]}));
     const result = await createGoogleSpeechProvider(config, fetchImpl).synthesize({text: 'Xin chào', language: 'vi', voice: 'Kore'});
     expect(result.durationMs).toBe(1000);
     expect(result.localPath).toMatch(/^assets\/google\/google-speech_[0-9a-f]{24}\.wav$/u);
+    expect(result.metadata.provider).toBe('google');
+    expect(result.metadata.model).toBe('speech-test');
+    expect(result.metadata.voice).toBe('Kore');
+    expect(result.metadata.language).toBe('vi');
+    expect(result.metadata.synthesisParameters).toEqual({
+      responseModality: 'AUDIO',
+      voice: 'Kore',
+      language: 'vi',
+      audioMimeType: 'audio/L16',
+      sampleRate: 24000,
+      channels: 1,
+      bitDepth: 16,
+    });
+  });
+
+  it('rejects unsupported Google speech audio formats before duration calculation', async () => {
+    const pcm = new Uint8Array(48000);
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(response({candidates: [{content: {parts: [{inlineData: {data: Buffer.from(pcm).toString('base64'), mimeType: 'audio/L16;rate=16000'}}]}}]}));
+    await expect(createGoogleSpeechProvider(config, fetchImpl).synthesize({text: 'Xin chào', language: 'vi', voice: 'Kore'})).rejects.toThrow(
+      'unsupported PCM format; expected audio/L16 at 24000 Hz',
+    );
+  });
+
+  it('rejects truncated supported PCM output', async () => {
+    const pcm = new Uint8Array(3);
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(response({candidates: [{content: {parts: [{inlineData: {data: Buffer.from(pcm).toString('base64'), mimeType: 'audio/L16;rate=24000'}}]}}]}));
+    await expect(createGoogleSpeechProvider(config, fetchImpl).synthesize({text: 'Xin chào', language: 'vi', voice: 'Kore'})).rejects.toThrow(
+      'truncated PCM data',
+    );
   });
 
   it('maps provider failures to explicit retry-aware stage codes without exposing response bodies', async () => {

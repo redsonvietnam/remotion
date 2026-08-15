@@ -37,7 +37,32 @@ const imageDimensions = (data: Uint8Array): {readonly width: number; readonly he
   throw new Error('Google image response is not a supported PNG asset');
 };
 
-const wavFromPcm = (pcm: Uint8Array, sampleRate = 24000): Uint8Array => {
+type SupportedPcmFormat = {
+  readonly mimeType: 'audio/L16';
+  readonly sampleRate: 24000;
+  readonly channels: 1;
+  readonly bitDepth: 16;
+};
+
+const SUPPORTED_PCM_FORMAT: SupportedPcmFormat = {
+  mimeType: 'audio/L16',
+  sampleRate: 24000,
+  channels: 1,
+  bitDepth: 16,
+};
+
+const validatePcmFormat = (mimeType: string | undefined): SupportedPcmFormat => {
+  const match = /^audio\/L16\s*;\s*rate=(\d+)\s*$/iu.exec(mimeType ?? '');
+  if (!match || Number(match[1]) !== SUPPORTED_PCM_FORMAT.sampleRate) {
+    throw new Error('Google speech provider returned unsupported PCM format; expected audio/L16 at 24000 Hz');
+  }
+  return SUPPORTED_PCM_FORMAT;
+};
+
+const wavFromPcm = (pcm: Uint8Array, format: SupportedPcmFormat): Uint8Array => {
+  if (pcm.byteLength % (format.channels * (format.bitDepth / 8)) !== 0) {
+    throw new Error('Google speech provider returned truncated PCM data');
+  }
   const header = new ArrayBuffer(44);
   const view = new DataView(header);
   const writeAscii = (offset: number, value: string) => [...value].forEach((char, index) => view.setUint8(offset + index, char.charCodeAt(0)));
@@ -47,11 +72,11 @@ const wavFromPcm = (pcm: Uint8Array, sampleRate = 24000): Uint8Array => {
   writeAscii(12, 'fmt ');
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
+  view.setUint16(22, format.channels, true);
+  view.setUint32(24, format.sampleRate, true);
+  view.setUint32(28, format.sampleRate * format.channels * (format.bitDepth / 8), true);
+  view.setUint16(32, format.channels * (format.bitDepth / 8), true);
+  view.setUint16(34, format.bitDepth, true);
   writeAscii(36, 'data');
   view.setUint32(40, pcm.byteLength, true);
   return new Uint8Array([...new Uint8Array(header), ...pcm]);
@@ -121,15 +146,31 @@ export const createGoogleSpeechProvider = (config: GoogleProviderConfig, fetchIm
     });
     const inlineData = response.candidates?.flatMap((candidate) => candidate.content?.parts ?? []).map((part) => part.inlineData).find((value) => value?.data);
     if (!inlineData?.data) throw new Error('Google speech provider returned no audio output');
+    const format = validatePcmFormat(inlineData.mimeType);
     const pcm = Buffer.from(inlineData.data, 'base64');
-    const wav = wavFromPcm(pcm);
+    const wav = wavFromPcm(pcm, format);
     const contentHash = sha256(wav);
     const identity = hashValue({request, provider: 'google', model: config.speechModel, contentHash}).slice(0, 24);
     const localPath = await writeAsset(config, `google-speech_${identity}.wav`, wav);
     return {
       localPath,
-      durationMs: Math.round((pcm.byteLength / (24000 * 2)) * 1000),
-      metadata: {provider: 'google', model: config.speechModel, requestHash: hashValue(request)},
+      durationMs: Math.round((pcm.byteLength / (format.sampleRate * format.channels * (format.bitDepth / 8))) * 1000),
+      metadata: {
+        provider: 'google',
+        model: config.speechModel,
+        requestHash: hashValue(request),
+        voice: request.voice,
+        language: request.language,
+        synthesisParameters: {
+          responseModality: 'AUDIO',
+          voice: request.voice,
+          language: request.language,
+          audioMimeType: format.mimeType,
+          sampleRate: format.sampleRate,
+          channels: format.channels,
+          bitDepth: format.bitDepth,
+        },
+      },
     };
   },
 });

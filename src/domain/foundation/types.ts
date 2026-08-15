@@ -115,6 +115,12 @@ export type SpeechSynthesisRequest = {
   readonly voice: string;
 };
 
+export type SpeechSynthesisProviderMetadata = CapabilityProviderMetadata & {
+  readonly voice: string;
+  readonly language: string;
+  readonly synthesisParameters: Readonly<Record<string, unknown>>;
+};
+
 export type SpeechWordTiming = {
   readonly word: string;
   readonly startMs: number;
@@ -125,7 +131,7 @@ export type SpeechSynthesisResult = {
   readonly localPath: string;
   readonly durationMs: number;
   readonly wordTimings?: readonly SpeechWordTiming[];
-  readonly metadata: CapabilityProviderMetadata;
+  readonly metadata: SpeechSynthesisProviderMetadata;
 };
 
 export type CaptionAlignmentRequest = {
