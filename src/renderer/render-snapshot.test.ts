@@ -60,12 +60,12 @@ describe('WS6 renderer boundary', () => {
     const cases = [
       ['../../../../../../providers/client', 'provider modules'],
       ['../../../../../../cli/command', 'CLI modules'],
-      ['../../../../../../domain/foundation/config', 'configuration modules'],
-      ['../../../../../../domain/secrets/token-loader', 'secret-loading modules'],
-      ['../../../../../../domain/pipeline/state', 'pipeline modules'],
-      ['../../../../../../domain/foundation/project', 'project-state modules'],
-      ['../../../../../../domain/foundation/asset-store', 'asset-store modules'],
-      ['../../../../../../domain/foundation/stage-run', 'stage-run modules'],
+      ['../../../../../../domain/foundation/config', 'configuration or secret-loading modules'],
+      ['../../../../../../domain/secrets/token-loader', 'configuration or secret-loading modules'],
+      ['../../../../../../domain/pipeline/state', 'mutable pipeline or project-state modules'],
+      ['../../../../../../domain/foundation/project', 'mutable pipeline or project-state modules'],
+      ['../../../../../../domain/foundation/asset-store', 'mutable pipeline or project-state modules'],
+      ['../../../../../../domain/foundation/stage-run', 'mutable pipeline or project-state modules'],
     ] as const;
 
     for (const [importPath, category] of cases) {
