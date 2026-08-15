@@ -44,12 +44,15 @@ describe('WS4 Timeline / Track / Clip', () => {
     expect(createTimeline(draft())).toEqual(createTimeline(draft()));
   });
 
-  it('normalizes track order deterministically', () => {
+  it('normalizes track and clip order deterministically', () => {
     const input = draft();
-    const reversed = {...input, tracks: [...input.tracks].reverse()};
+    const visual = input.tracks[0];
+    const reversed = {...input, tracks: [...input.tracks].reverse().map((track) =>
+      track.kind === 'visual' ? {...track, clips: [...visual.clips].reverse()} : track)};
     const timeline = compileTimeline(reversed);
     expect(timeline.tracks.map((track) => track.order)).toEqual([0, 1]);
     expect(timeline.tracks.map((track) => track.kind)).toEqual(['visual', 'music']);
+    expect(timeline.tracks[0].clips.map((clip) => clip.startFrame)).toEqual([0, 60]);
   });
 
   it('uses integer frames as the runtime timing unit', () => {
@@ -65,9 +68,22 @@ describe('WS4 Timeline / Track / Clip', () => {
     expect(isTimeline(timeline)).toBe(true);
   });
 
-  it('rejects unexpected persisted Timeline fields', () => {
+  it('rejects unexpected persisted fields at Timeline, Track, and Clip levels', () => {
     const timeline = createTimeline(draft());
     expect(isTimeline({...timeline, secret: 'nope'})).toBe(false);
+    expect(isTimeline({...timeline, tracks: [{...timeline.tracks[0], extra: true}, timeline.tracks[1]]})).toBe(false);
+    expect(isTimeline({...timeline, tracks: timeline.tracks.map((track, index) => index === 0
+      ? {...track, clips: [{...track.clips[0], extra: true}, track.clips[1]]}
+      : track)})).toBe(false);
+  });
+
+  it('rejects invalid IDs and required fields', () => {
+    const timeline = createTimeline(draft());
+    expect(isTimeline({...timeline, id: 'timeline_not-deterministic'})).toBe(false);
+    expect(isTimeline({...timeline, tracks: timeline.tracks.map((track, index) => index === 0 ? {...track, order: 3} : track)})).toBe(false);
+    expect(isTimeline({...timeline, tracks: timeline.tracks.map((track, index) => index === 0
+      ? {...track, clips: [{...track.clips[0], startFrame: -1}, track.clips[1]]}
+      : track)})).toBe(false);
   });
 
   it('rejects invalid clip timing and duration', () => {
@@ -108,16 +124,15 @@ describe('WS4 Timeline / Track / Clip', () => {
     expect(isTimeline(createTimeline(overlapping))).toBe(true);
   });
 
-  it('rejects malformed references', () => {
+  it('rejects malformed references but permits unresolved references', () => {
     const timeline = createTimeline(draft());
-    const invalid = {...timeline, tracks: timeline.tracks.map((track, index) => index === 0
+    const invalidAsset = {...timeline, tracks: timeline.tracks.map((track, index) => index === 0
       ? {...track, clips: [{...track.clips[0], reference: {kind: 'asset', assetId: 'not-an-asset-id'}}, track.clips[1]]}
       : track)};
-    expect(isTimeline(invalid)).toBe(false);
-  });
-
-  it('rejects non-canonical runtime IDs', () => {
-    const timeline = createTimeline(draft());
-    expect(isTimeline({...timeline, id: 'timeline_not-deterministic'})).toBe(false);
+    const invalidContent = {...timeline, tracks: timeline.tracks.map((track, index) => index === 0
+      ? {...track, clips: [{...track.clips[0], reference: {kind: 'content', identity: ''}}, track.clips[1]]}
+      : track)};
+    expect(isTimeline(invalidAsset)).toBe(false);
+    expect(isTimeline(invalidContent)).toBe(false);
   });
 });
