@@ -10,11 +10,12 @@
     "render": "remotion render MainVideo out/video.mp4",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "check:renderer-boundary": "eslint --config eslint.renderer.config.mjs src/renderer",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "npm run typecheck && npm run lint && npm test && npm run build"
+    "ci": "npm run typecheck && npm run lint && npm test && npm run build && npm run check:renderer-boundary"
   },
   "engines": {
     "node": ">=22"
