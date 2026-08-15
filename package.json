@@ -1,0 +1,39 @@
+{
+  "name": "remotion-video-template",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Production-oriented reusable template for vertical short-form videos with Remotion.",
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio --no-open",
+    "build": "remotion bundle",
+    "render": "remotion render MainVideo out/video.mp4",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ci": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@remotion/media": "4.0.503",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "remotion": "4.0.503"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.503",
+    "@remotion/eslint-config-flat": "4.0.502",
+    "@types/node": "24.3.0",
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.7",
+    "eslint": "9.28.0",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}
