@@ -1,6 +1,5 @@
 import {
   AbsoluteFill,
-  Easing,
   Img,
   Sequence,
   interpolate,
