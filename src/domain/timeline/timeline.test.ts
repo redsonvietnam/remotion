@@ -87,8 +87,7 @@ describe('WS4 Timeline / Track / Clip', () => {
   });
 
   it('accepts adjacent clips and gaps', () => {
-    const adjacent = createTimeline(draft());
-    expect(isTimeline(adjacent)).toBe(true);
+    expect(isTimeline(createTimeline(draft()))).toBe(true);
     const source = draft();
     const visual = source.tracks[0];
     const withGap = {...source, tracks: [{...visual, clips: [visual.clips[0], {...visual.clips[1], startFrame: 90}]}, source.tracks[1]]};
@@ -99,8 +98,7 @@ describe('WS4 Timeline / Track / Clip', () => {
     const source = draft();
     const visual = source.tracks[0];
     const overlapping = {...source, tracks: [{...visual, clips: [visual.clips[0], {...visual.clips[1], startFrame: 30}]}, source.tracks[1]]};
-    const timeline = {...createTimeline(overlapping), tracks: []};
-    expect(isTimeline(timeline)).toBe(false);
+    expect(isTimeline(createTimeline(overlapping))).toBe(false);
   });
 
   it('accepts overlaps on tracks explicitly allowing them', () => {
