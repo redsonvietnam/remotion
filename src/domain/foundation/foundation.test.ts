@@ -1,4 +1,4 @@
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
@@ -171,11 +171,9 @@ describe('foundation', () => {
     const {root, projectId} = await makeTempProject();
     const request = makeRequest();
     const assetId = createGeneratedAssetId(request);
+    await mkdir(projectPaths(root, projectId).assets, {recursive: true});
     const assetPath = resolveProjectPath(root, projectId, `assets/${assetId}.png`);
-    await writeFile(assetPath, 'asset', {encoding: 'utf8'}).catch(async () => {
-      await import('node:fs/promises').then(({mkdir}) => mkdir(projectPaths(root, projectId).assets, {recursive: true}));
-      await writeFile(assetPath, 'asset', {encoding: 'utf8'});
-    });
+    await writeFile(assetPath, 'asset', {encoding: 'utf8'});
 
     expect((await findCachedAsset(root, projectId, request)).hit).toBe(false);
   });
@@ -198,6 +196,7 @@ describe('foundation', () => {
     expect(() => assetFilePath(root, projectId, fakeAsset)).toThrow('Project path escapes project boundary');
     expect(() => assetMetadataPath(root, projectId, fakeAsset)).toThrow('Project path escapes project boundary');
     expect(() => resolveProjectPath(root, projectId, 'assets/../../outside.png')).toThrow('Project path escapes project boundary');
+    expect(resolveProjectPath(root, projectId, 'assets/a.png')).toBe(join(root, projectId, 'assets', 'a.png'));
   });
 
   it('uses CLI > project > user > environment > defaults precedence', () => {
