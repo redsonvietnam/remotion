@@ -1,3 +1,4 @@
+import {Audio, Video} from '@remotion/media';
 import {
   AbsoluteFill,
   Img,
@@ -25,7 +26,20 @@ const SceneCard = ({scene, content}: {scene: Scene; content: VideoContent}) => {
         background: `radial-gradient(circle at 80% 20%, ${content.theme.accent}33, transparent 35%), ${content.theme.background}`,
       }}
     >
-      {scene.image ? (
+      {scene.video ? (
+        <Video
+          src={staticFile(scene.video)}
+          muted
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.3,
+          }}
+        />
+      ) : scene.image ? (
         <Img
           src={staticFile(scene.image)}
           style={{
@@ -106,6 +120,10 @@ export const ShortVideo = ({content}: {content: VideoContent}) => {
         overflow: 'hidden',
       }}
     >
+      {content.backgroundAudio ? (
+        <Audio src={staticFile(content.backgroundAudio)} volume={0.15} loop />
+      ) : null}
+
       <Sequence from={0} durationInFrames={introFrames}>
         <AbsoluteFill
           style={{
