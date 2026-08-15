@@ -14,14 +14,17 @@ const clipIdentityInput = (clip: Omit<TimelineClip, 'id'>) => ({
   reference: clip.reference,
 });
 
-const sortClips = <T extends {startFrame: number; reference: ClipReference; role: string; durationFrames: number}>(clips: readonly T[]): T[] =>
-  [...clips].sort((a, b) => a.startFrame - b.startFrame || stableJson(clipIdentityInput(a as Omit<TimelineClip, 'id'>)).localeCompare(stableJson(clipIdentityInput(b as Omit<TimelineClip, 'id'>))));
+const sortClips = (clips: readonly Omit<TimelineClip, 'id'>[]): Omit<TimelineClip, 'id'>[] =>
+  [...clips].sort((a, b) =>
+    a.startFrame - b.startFrame ||
+    stableJson(clipIdentityInput(a)).localeCompare(stableJson(clipIdentityInput(b))),
+  );
 
 const trackIdentityInput = (track: Omit<TimelineTrack, 'id'>) => ({
   kind: track.kind,
   order: track.order,
   allowOverlap: track.allowOverlap,
-  clips: sortClips(track.clips).map(({id: _id, ...clip}) => clipIdentityInput(clip)),
+  clips: sortClips(track.clips).map(clipIdentityInput),
 });
 
 export const createClip = (clip: Omit<TimelineClip, 'id'>): TimelineClip => ({
@@ -30,7 +33,7 @@ export const createClip = (clip: Omit<TimelineClip, 'id'>): TimelineClip => ({
 });
 
 export const createTrack = (track: Omit<TimelineTrack, 'id'>): TimelineTrack => {
-  const clips = sortClips(track.clips).map((clip) => createClip(clip));
+  const clips = sortClips(track.clips).map(createClip);
   return {
     ...track,
     clips,
@@ -41,7 +44,7 @@ export const createTrack = (track: Omit<TimelineTrack, 'id'>): TimelineTrack => 
 export const createTimeline = (draft: TimelineDraft): Timeline => {
   const tracks = [...draft.tracks]
     .sort((a, b) => a.order - b.order)
-    .map((track) => createTrack(track));
+    .map(createTrack);
   const identityInput = {
     schemaVersion: draft.schemaVersion,
     fps: draft.fps,
@@ -62,10 +65,9 @@ export const normalizeTimeline = (timeline: Timeline): Timeline => {
     .sort((a, b) => a.order - b.order)
     .map((track) => ({
       ...track,
-      clips: sortClips(track.clips),
+      clips: sortClips(track.clips).map(createClip),
     }));
-  const normalized = {...timeline, tracks};
-  return createTimeline(normalized);
+  return createTimeline({...timeline, tracks});
 };
 
 export const clipEndFrame = (clip: Pick<TimelineClip, 'startFrame' | 'durationFrames'>): number =>
