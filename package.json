@@ -20,14 +20,14 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@remotion/media": "4.0.503",
+    "@remotion/media": "4.0.512",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "remotion": "4.0.503"
+    "remotion": "4.0.512"
   },
   "devDependencies": {
-    "@remotion/cli": "4.0.503",
-    "@remotion/eslint-config-flat": "4.0.502",
+    "@remotion/cli": "4.0.512",
+    "@remotion/eslint-config-flat": "4.0.512",
     "@types/node": "24.3.0",
     "@types/react": "19.1.10",
     "@types/react-dom": "19.1.7",
