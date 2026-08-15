@@ -13,7 +13,7 @@ const canonicalize = (value: unknown): unknown => {
   return value;
 };
 
-export const stableJson = (value: unknown): string => JSON.stringify(canonicalize(value));
+export const stableJson = (value: unknown): string => JSON.stringify(canonicalize(value)) ?? 'undefined';
 
 export const sha256 = (value: string | Uint8Array): string =>
   createHash('sha256').update(value).digest('hex');
