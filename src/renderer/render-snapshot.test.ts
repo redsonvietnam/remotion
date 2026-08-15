@@ -58,14 +58,14 @@ describe('WS6 renderer boundary', () => {
 
   it('rejects forbidden imports at arbitrary renderer nesting depth', async () => {
     const cases = [
-      ['../../../../../../providers/client', 'provider modules'],
-      ['../../../../../../cli/command', 'CLI modules'],
-      ['../../../../../../domain/foundation/config', 'configuration or secret-loading modules'],
-      ['../../../../../../domain/secrets/token-loader', 'configuration or secret-loading modules'],
-      ['../../../../../../domain/pipeline/state', 'mutable pipeline or project-state modules'],
-      ['../../../../../../domain/foundation/project', 'mutable pipeline or project-state modules'],
-      ['../../../../../../domain/foundation/asset-store', 'mutable pipeline or project-state modules'],
-      ['../../../../../../domain/foundation/stage-run', 'mutable pipeline or project-state modules'],
+      ['../../../../providers/client', 'provider modules'],
+      ['../../../../cli/command', 'CLI modules'],
+      ['../../../../domain/foundation/config', 'configuration or secret-loading modules'],
+      ['../../../../domain/secrets/token-loader', 'configuration or secret-loading modules'],
+      ['../../../../domain/pipeline/state', 'mutable pipeline or project-state modules'],
+      ['../../../../domain/foundation/project', 'mutable pipeline or project-state modules'],
+      ['../../../../domain/foundation/asset-store', 'mutable pipeline or project-state modules'],
+      ['../../../../domain/foundation/stage-run', 'mutable pipeline or project-state modules'],
     ] as const;
 
     for (const [importPath, category] of cases) {
@@ -76,7 +76,7 @@ describe('WS6 renderer boundary', () => {
   });
 
   it('allows legitimate renderer imports into the domain regardless of nesting depth', async () => {
-    const messages = await lintNestedRendererImport('../../../../../../domain/timeline/timeline');
+    const messages = await lintNestedRendererImport('../../../../domain/timeline/timeline');
     expect(messages.filter((message) => message.severity === 2)).toEqual([]);
   });
 });
