@@ -22,6 +22,10 @@ export default [
               message: 'Renderer must not import configuration or secret-loading modules.',
             },
             {
+              regex: '(^|/)(secret(?:-[^/]+)?|apikey|api-key|env(?:-[^/]+)?)(?:\\.[^/]+)?$',
+              message: 'Renderer must not import configuration or secret-loading modules.',
+            },
+            {
               regex: '(^|/)(pipeline|asset-store|project|stage-run)(/|$)',
               message: 'Renderer must not import mutable pipeline or project-state modules.',
             },
