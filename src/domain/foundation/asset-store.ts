@@ -1,8 +1,9 @@
 import {createHash} from 'node:crypto';
-import {mkdir, readFile, stat, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, readdir, writeFile} from 'node:fs/promises';
 import {basename, extname} from 'node:path';
-import {projectPaths, resolveProjectPath} from './paths';
 import {createAssetCacheKey, createGeneratedAssetId, normalizeAssetRequest, type GeneratedAssetRequest} from './assets';
+import {stableJson} from './ids';
+import {projectPaths, resolveProjectPath} from './paths';
 import {isAssetRecord, parseAssetRecord} from './validation';
 import type {AssetRecord} from './types';
 
@@ -23,8 +24,9 @@ const contentHash = (data: Uint8Array): string =>
   createHash('sha256').update(data).digest('hex');
 
 const assetFileName = (assetId: string, extension: string): string => {
-  if (!EXTENSION_PATTERN.test(extension)) throw new Error('Invalid asset extension');
-  return `${assetId}.${extension.replace(/^\./, '')}`;
+  const normalizedExtension = extension.replace(/^\./, '');
+  if (!EXTENSION_PATTERN.test(normalizedExtension)) throw new Error('Invalid asset extension');
+  return `${assetId}.${normalizedExtension}`;
 };
 
 const metadataPathFor = (assetPath: string): string => `${assetPath}.meta.json`;
@@ -38,7 +40,7 @@ const readValidMetadata = async (metadataPath: string): Promise<AssetRecord | un
   }
 };
 
-export const metadataJson = (asset: AssetRecord): string => `${JSON.stringify(JSON.parse(JSON.stringify(asset, Object.keys(asset).sort())), null, 2)}\n`;
+export const metadataJson = (asset: AssetRecord): string => `${stableJson(asset)}\n`;
 
 export const storeGeneratedAsset = async (
   projectRoot: string,
@@ -58,6 +60,7 @@ export const storeGeneratedAsset = async (
     if (cached.hit && cached.asset) return cached.asset;
   }
 
+  const normalized = normalizeAssetRequest(input.request);
   const record: AssetRecord = {
     schemaVersion: 1,
     id: assetId,
@@ -72,9 +75,9 @@ export const storeGeneratedAsset = async (
     provenance: {
       provider: input.request.provider,
       model: input.request.model,
-      generationParameters: JSON.parse(JSON.stringify(normalizeAssetRequest(input.request).generationParameters)),
+      generationParameters: normalized.generationParameters,
     },
-    lineage: [...normalizeAssetRequest(input.request).lineage],
+    lineage: normalized.lineage,
   };
 
   parseAssetRecord(record);
@@ -92,24 +95,24 @@ export const findCachedAsset = async (
   const assetId = createGeneratedAssetId(request);
   const cacheKey = createAssetCacheKey(request);
   const assetRoot = projectPaths(projectRoot, projectId).assets;
-  const prefix = `${assetId}.`;
 
-  let entries;
+  let entries: string[];
   try {
-    entries = await stat(assetRoot).then(() => readFileDirectory(assetRoot));
+    entries = await readdir(assetRoot);
   } catch {
     return {hit: false};
   }
 
+  const normalized = normalizeAssetRequest(request);
   for (const fileName of entries) {
-    if (!fileName.startsWith(prefix) || fileName.endsWith('.meta.json')) continue;
+    if (!fileName.startsWith(`${assetId}.`) || fileName.endsWith('.meta.json')) continue;
     const assetPath = resolveProjectPath(projectRoot, projectId, `assets/${fileName}`);
     const metadata = await readValidMetadata(metadataPathFor(assetPath));
     if (!metadata || metadata.origin !== 'generated' || metadata.cacheKey !== cacheKey) continue;
     if (metadata.id !== assetId || !metadata.provenance) continue;
     if (metadata.provenance.provider !== request.provider || metadata.provenance.model !== request.model) continue;
-    if (metadata.provenance.generationParameters &&
-        JSON.stringify(metadata.provenance.generationParameters) !== JSON.stringify(normalizeAssetRequest(request).generationParameters)) continue;
+    if (stableJson(metadata.provenance.generationParameters) !== stableJson(normalized.generationParameters)) continue;
+    if (stableJson(metadata.lineage) !== stableJson(normalized.lineage)) continue;
 
     try {
       const bytes = await readFile(assetPath);
@@ -121,11 +124,6 @@ export const findCachedAsset = async (
   }
 
   return {hit: false};
-};
-
-const readFileDirectory = async (directory: string): Promise<string[]> => {
-  const {readdir} = await import('node:fs/promises');
-  return readdir(directory);
 };
 
 export const assetMetadataPath = (projectRoot: string, projectId: string, asset: AssetRecord): string =>
