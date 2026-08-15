@@ -1,4 +1,5 @@
 import {normalizeTypographyText} from './normalization';
+import {deterministicOpenTypeMeasurement, type TextMeasurementCapability} from './measurement';
 import {validateGlyphCoverage} from './validation';
 import type {FontManifest, TextLayout, TextLayoutLine, TypographySpec} from './types';
 
@@ -6,31 +7,21 @@ const assertPositive = (name: string, value: number): void => {
   if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be a positive finite number`);
 };
 
-const measureCodePoint = (codePoint: number, font: FontManifest): number => {
-  const key = codePoint.toString(16).toUpperCase().padStart(4, '0');
-  const units = font.advanceWidths[key];
-  if (units === undefined) throw new Error(`Font "${font.family}" does not cover U+${key}`);
-  return units / font.unitsPerEm;
-};
-
-export const measureText = (text: string, spec: TypographySpec, font: FontManifest): number => {
-  const normalized = normalizeTypographyText(text);
-  validateGlyphCoverage(normalized, font);
-  let width = 0;
-  let count = 0;
-  for (const character of normalized) {
-    const codePoint = character.codePointAt(0);
-    if (codePoint === undefined) continue;
-    width += measureCodePoint(codePoint, font) * spec.fontSize;
-    count += 1;
-  }
-  if (count > 1) width += spec.letterSpacing * (count - 1);
-  return width;
-};
+export const measureText = (
+  text: string,
+  spec: TypographySpec,
+  font: FontManifest,
+  measurement: TextMeasurementCapability = deterministicOpenTypeMeasurement,
+): number => measurement.measure(text, spec, font);
 
 const splitWords = (text: string): string[] => text.trim().split(/\s+/u).filter(Boolean);
 
-export const layoutText = (text: string, spec: TypographySpec, font: FontManifest): TextLayout => {
+export const layoutText = (
+  text: string,
+  spec: TypographySpec,
+  font: FontManifest,
+  measurement: TextMeasurementCapability = deterministicOpenTypeMeasurement,
+): TextLayout => {
   assertPositive('fontSize', spec.fontSize);
   assertPositive('lineHeight', spec.lineHeight);
   assertPositive('maxWidth', spec.maxWidth);
@@ -48,10 +39,10 @@ export const layoutText = (text: string, spec: TypographySpec, font: FontManifes
   const lines: TextLayoutLine[] = [];
   let current = '';
   let currentWidth = 0;
-  const spaceWidth = measureText(' ', spec, font);
+  const spaceWidth = measureText(' ', spec, font, measurement);
 
   for (const word of words) {
-    const wordWidth = measureText(word, spec, font);
+    const wordWidth = measureText(word, spec, font, measurement);
     const candidateWidth = current ? currentWidth + spaceWidth + wordWidth : wordWidth;
     if (current && candidateWidth > spec.maxWidth) {
       lines.push({text: current, width: currentWidth});

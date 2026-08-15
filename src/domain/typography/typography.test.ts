@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {describe, expect, it} from 'vitest';
 import {VIETNAMESE_FONT_MANIFEST} from './font-manifest';
+import {deterministicOpenTypeMeasurement} from './measurement';
 import {layoutText, measureText} from './layout';
 import {normalizeTypographyText} from './normalization';
 import {requiredVietnameseFixtureText, validateGlyphCoverage, validateVietnameseFont} from './validation';
@@ -47,6 +48,18 @@ describe('Vietnamese typography', () => {
     );
   });
 
+  it('uses the explicit deterministic OpenType measurement contract', () => {
+    const measured = measureText('Nghị quyết', baseSpec, VIETNAMESE_FONT_MANIFEST);
+    expect(measured).toBe(deterministicOpenTypeMeasurement.measure('Nghị quyết', baseSpec, VIETNAMESE_FONT_MANIFEST));
+    expect(measured).toBeGreaterThan(0);
+  });
+
+  it('documents the shaping/kerning boundary through the deterministic adapter', () => {
+    expect(deterministicOpenTypeMeasurement).toBeDefined();
+    expect(layoutText('Việt Nam', baseSpec, VIETNAMESE_FONT_MANIFEST, deterministicOpenTypeMeasurement))
+      .toEqual(layoutText('Việt Nam', baseSpec, VIETNAMESE_FONT_MANIFEST, deterministicOpenTypeMeasurement));
+  });
+
   it('lays out short Vietnamese text deterministically', () => {
     const first = layoutText('Việt Nam', baseSpec, VIETNAMESE_FONT_MANIFEST);
     const second = layoutText('Việt Nam', baseSpec, VIETNAMESE_FONT_MANIFEST);
@@ -87,6 +100,15 @@ describe('Vietnamese typography', () => {
     expect(VIETNAMESE_FONT_MANIFEST.file).not.toMatch(/^([A-Za-z]:)?[\\/]/);
     expect(VIETNAMESE_FONT_MANIFEST.file).not.toContain('..');
     expect(requiredVietnameseFixtureText).toContain('ắ');
+  });
+
+  it('keeps core typography free of Remotion imports', async () => {
+    const coreFiles = ['types.ts', 'font-manifest.ts', 'normalization.ts', 'validation.ts', 'measurement.ts', 'layout.ts', 'index.ts'];
+    for (const file of coreFiles) {
+      const source = await readFile(new URL(`./${file}`, import.meta.url), 'utf8');
+      expect(source).not.toMatch(/from ['"]remotion['"]/);
+      expect(source).not.toMatch(/from ['"]remotion\//);
+    }
   });
 
   it('fails explicitly when a required glyph is unavailable', () => {

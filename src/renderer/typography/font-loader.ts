@@ -1,5 +1,5 @@
 import {cancelRender, continueRender, delayRender, staticFile} from 'remotion';
-import {VIETNAMESE_FONT_MANIFEST} from './font-manifest';
+import {VIETNAMESE_FONT_MANIFEST} from '../../domain/typography/font-manifest';
 
 export const bundledVietnameseFontUrl = (): string => staticFile(VIETNAMESE_FONT_MANIFEST.file);
 
