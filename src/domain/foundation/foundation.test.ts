@@ -26,6 +26,32 @@ describe('foundation', () => {
     expect(isStageRunRecord({schemaVersion: 1, id: 'run_x', projectId: 'project_x', stage: 'render', status: 'running', attempt: 0, startedAt: 'bad', inputHash: 'x', dependencyRunIds: []})).toBe(false);
   });
 
+  it('rejects unexpected persisted ProjectRecord fields', () => {
+    const project = {schemaVersion: 1, id: 'project_x', name: 'x', createdAt: '2026-08-15T00:00:00.000Z'};
+    expect(isProjectRecord({...project, apiKey: 'secret'})).toBe(false);
+    expect(isProjectRecord({...project, unexpected: true})).toBe(false);
+  });
+
+  it('rejects impossible persisted StageRun lifecycle states', () => {
+    const base = {
+      schemaVersion: 1,
+      id: 'run_x',
+      projectId: 'project_x',
+      stage: 'render',
+      attempt: 1,
+      startedAt: '2026-08-15T00:00:00.000Z',
+      inputHash: 'input',
+      dependencyRunIds: [],
+    };
+
+    expect(isStageRunRecord({...base, status: 'running', finishedAt: '2026-08-15T00:00:01.000Z'})).toBe(false);
+    expect(isStageRunRecord({...base, status: 'running', outputHash: 'output'})).toBe(false);
+    expect(isStageRunRecord({...base, status: 'running', errorCode: 'late'})).toBe(false);
+    expect(isStageRunRecord({...base, status: 'succeeded', finishedAt: '2026-08-15T00:00:01.000Z', errorCode: 'bad'})).toBe(false);
+    expect(isStageRunRecord({...base, status: 'failed', finishedAt: '2026-08-15T00:00:01.000Z'})).toBe(false);
+    expect(isStageRunRecord({...base, status: 'failed', finishedAt: '2026-08-15T00:00:01.000Z', errorCode: 'failed', outputHash: 'output'})).toBe(false);
+  });
+
   it('enforces the project path boundary', () => {
     expect(resolveProjectPath('/tmp/projects', 'project_x', 'assets/a.png')).toBe('/tmp/projects/project_x/assets/a.png');
     expect(() => resolveProjectPath('/tmp/projects', 'project_x', '../outside')).toThrow();
