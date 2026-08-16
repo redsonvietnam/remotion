@@ -1,10 +1,8 @@
-import type {
-  CaptionAlignmentCapability,
-  SpeechSynthesisResult,
-} from '../foundation/capabilities';
+import type {CaptionAlignmentCapability} from '../foundation/capabilities';
 import type {
   CaptionAlignmentRequest,
   CaptionTiming,
+  SpeechSynthesisResult,
 } from '../foundation/types';
 import type {CaptionTrack} from './types';
 import {normalizeCaptionTimings} from './normalization';

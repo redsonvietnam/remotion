@@ -1,34 +1,36 @@
 import type {CaptionTrack} from './types';
-import {normalizeCaptionTimings} from './normalization';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
+const isValidTiming = (value: unknown): boolean =>
+  isRecord(value) &&
+  isNonEmptyString(value.text) &&
+  typeof value.startMs === 'number' &&
+  typeof value.endMs === 'number' &&
+  Number.isFinite(value.startMs) &&
+  Number.isFinite(value.endMs) &&
+  value.startMs >= 0 &&
+  value.endMs > value.startMs;
+
 export const isValidCaptionTrack = (
   value: unknown,
 ): value is CaptionTrack => {
-  if (typeof value !== 'object' || value === null) return false;
+  if (!isRecord(value)) return false;
 
-  const track = value as Partial<CaptionTrack>;
+  if (!isNonEmptyString(value.language)) return false;
 
-  if (!isNonEmptyString(track.language)) return false;
+  if (!Array.isArray(value.timings)) return false;
 
-  if (!Array.isArray(track.timings)) return false;
+  for (let index = 0; index < value.timings.length; index += 1) {
+    const timing = value.timings[index];
 
-  const timings = normalizeCaptionTimings(track.timings);
+    if (!isValidTiming(timing)) return false;
 
-  for (let index = 0; index < timings.length; index += 1) {
-    const timing = timings[index];
-
-    if (!isNonEmptyString(timing.text)) return false;
-
-    if (!Number.isFinite(timing.startMs)) return false;
-    if (!Number.isFinite(timing.endMs)) return false;
-
-    if (timing.startMs < 0) return false;
-    if (timing.endMs <= timing.startMs) return false;
-
-    const previous = timings[index - 1];
+    const previous = value.timings[index - 1];
 
     if (previous && timing.startMs < previous.endMs) {
       return false;
