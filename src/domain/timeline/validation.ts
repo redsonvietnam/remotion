@@ -62,27 +62,30 @@ export const isTimelineTrack = (value: unknown): value is TimelineTrack => {
 export const isTimeline = (value: unknown): value is Timeline => {
   if (!isRecord(value) || !hasExactKeys(value, TIMELINE_KEYS)) return false;
   if (value.schemaVersion !== 1 || typeof value.id !== 'string' || !timelineId.test(value.id)) return false;
-  if (!isPositiveInteger(value.fps) || !isPositiveInteger(value.durationFrames) || !Array.isArray(value.tracks)) return false;
-  if (!value.tracks.every(isTimelineTrack)) return false;
-  if (value.tracks.some((track) => track.order !== value.tracks.indexOf(track))) return false;
-  const orders = new Set(value.tracks.map((track) => track.order));
-  if (orders.size !== value.tracks.length) return false;
-  if (value.tracks.some((track) => track.clips.some((clip) => clipEndFrame(clip) > value.durationFrames))) return false;
-  if (value.tracks.some((track) => {
+
+  const {durationFrames, fps, tracks} = value;
+
+  if (!isPositiveInteger(fps) || !isPositiveInteger(durationFrames) || !Array.isArray(tracks)) return false;
+  if (!tracks.every(isTimelineTrack)) return false;
+  if (tracks.some((track) => track.order !== tracks.indexOf(track))) return false;
+  const orders = new Set(tracks.map((track) => track.order));
+  if (orders.size !== tracks.length) return false;
+  if (tracks.some((track) => track.clips.some((clip) => clipEndFrame(clip) > durationFrames))) return false;
+  if (tracks.some((track) => {
     if (track.allowOverlap) return false;
     const clips = [...track.clips].sort((a, b) => a.startFrame - b.startFrame || a.id.localeCompare(b.id));
     return clips.some((clip, index) => index > 0 && clip.startFrame < clipEndFrame(clips[index - 1]));
   })) return false;
 
-  const expectedTracks = [...value.tracks].sort((a, b) => a.order - b.order).map(({id: _id, ...track}) => ({
+  const expectedTracks = [...tracks].sort((a, b) => a.order - b.order).map(({id: _id, ...track}) => ({
     ...track,
     clips: track.clips.map(({id: _clipId, ...clip}) => clip),
   }));
-  const expected = createTimeline({schemaVersion: 1, fps: value.fps, durationFrames: value.durationFrames, tracks: expectedTracks});
+  const expected = createTimeline({schemaVersion: 1, fps, durationFrames, tracks: expectedTracks});
   return expected.id === value.id && expected.tracks.every((track, index) =>
-    track.id === value.tracks[index].id &&
-    track.clips.length === value.tracks[index].clips.length &&
-    track.clips.every((clip, clipIndex) => clip.id === value.tracks[index].clips[clipIndex].id));
+    track.id === tracks[index].id &&
+    track.clips.length === tracks[index].clips.length &&
+    track.clips.every((clip, clipIndex) => clip.id === tracks[index].clips[clipIndex].id));
 };
 
 export const validateTimeline = (value: unknown): {readonly valid: true} | {readonly valid: false; readonly issues: readonly string[]} => {

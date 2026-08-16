@@ -120,7 +120,7 @@ describe('WS4 Timeline / Track / Clip', () => {
   it('accepts overlaps on tracks explicitly allowing them', () => {
     const source = draft();
     const music = source.tracks[1];
-    const overlapping = {...source, tracks: [{...source.tracks[0]}, {...music, clips: [music.clips[0], {...music.clips[0], startFrame: 30}]}]};
+    const overlapping = {...source, tracks: [{...source.tracks[0]}, {...music, clips: [music.clips[0], {...music.clips[0], startFrame: 30, durationFrames: 120}]}]};
     expect(isTimeline(createTimeline(overlapping))).toBe(true);
   });
 

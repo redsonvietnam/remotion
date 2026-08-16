@@ -41,11 +41,13 @@ export type Timeline = {
   readonly tracks: readonly TimelineTrack[];
 };
 
+export type TimelineTrackDraft = Omit<TimelineTrack, 'id' | 'clips'> & {
+  readonly id?: TrackId;
+  readonly clips: readonly Omit<TimelineClip, 'id'>[];
+};
+
 export type TimelineDraft = Omit<Timeline, 'id' | 'tracks'> & {
-  readonly tracks: readonly (Omit<TimelineTrack, 'id' | 'clips'> & {
-    readonly id?: TrackId;
-    readonly clips: readonly Omit<TimelineClip, 'id'>[];
-  })[];
+  readonly tracks: readonly TimelineTrackDraft[];
 };
 
 export type TimelineSegment = {

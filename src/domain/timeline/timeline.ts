@@ -1,6 +1,6 @@
 import {deterministicId, hashValue, stableJson} from '../foundation/ids';
 import type {AssetId} from '../foundation/types';
-import type {ClipId, ClipReference, Timeline, TimelineClip, TimelineDraft, TimelineTrack, TrackId} from './types';
+import type {ClipId, ClipReference, Timeline, TimelineClip, TimelineDraft, TimelineTrack, TimelineTrackDraft, TrackId} from './types';
 
 const asTimelineId = (value: string) => value as Timeline['id'];
 const asTrackId = (value: string) => value as TrackId;
@@ -20,7 +20,7 @@ const sortClips = (clips: readonly Omit<TimelineClip, 'id'>[]): Omit<TimelineCli
     stableJson(clipIdentityInput(a)).localeCompare(stableJson(clipIdentityInput(b))),
   );
 
-const trackIdentityInput = (track: Omit<TimelineTrack, 'id'>) => ({
+const trackIdentityInput = (track: TimelineTrackDraft) => ({
   kind: track.kind,
   order: track.order,
   allowOverlap: track.allowOverlap,
@@ -32,7 +32,7 @@ export const createClip = (clip: Omit<TimelineClip, 'id'>): TimelineClip => ({
   id: asClipId(deterministicId('clip', clipIdentityInput(clip))),
 });
 
-export const createTrack = (track: Omit<TimelineTrack, 'id'>): TimelineTrack => {
+export const createTrack = (track: TimelineTrackDraft): TimelineTrack => {
   const clips = sortClips(track.clips).map(createClip);
   return {
     ...track,
