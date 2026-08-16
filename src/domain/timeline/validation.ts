@@ -1,6 +1,8 @@
 import {deterministicId} from '../foundation/ids';
+import {isValidCaptionTrack} from '../captions/validation';
+import {buildTimeline} from './timeline-builder';
 import {clipEndFrame, createTimeline} from './timeline';
-import type {ClipReference, Timeline, TimelineClip, TimelineTrack} from './types';
+import type {ClipReference, Timeline, TimelineClip, TimelinePlan, TimelineSegment, TimelineTrack} from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -11,6 +13,9 @@ const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]) =
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 };
 
+const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(value).every((key) => keys.includes(key));
+
 const isInteger = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value);
 const isNonNegativeInteger = (value: unknown): value is number => isInteger(value) && value >= 0;
 const isPositiveInteger = (value: unknown): value is number => isInteger(value) && value > 0;
@@ -20,10 +25,14 @@ const timelineId = /^timeline_[a-f0-9]{24}$/;
 const trackId = /^track_[a-f0-9]{24}$/;
 const clipId = /^clip_[a-f0-9]{24}$/;
 const assetId = /^asset_[a-f0-9]{24}$/;
+const timelinePlanId = /^timelinePlan_[a-f0-9]{24}$/;
+const segmentId = /^segment_[a-f0-9]{24}$/;
 
 const CLIP_KEYS = ['schemaVersion', 'id', 'role', 'startFrame', 'durationFrames', 'reference'] as const;
 const TRACK_KEYS = ['schemaVersion', 'id', 'kind', 'order', 'clips', 'allowOverlap'] as const;
 const TIMELINE_KEYS = ['schemaVersion', 'id', 'fps', 'durationFrames', 'tracks'] as const;
+const SEGMENT_KEYS = ['schemaVersion', 'id', 'startMs', 'endMs', 'assetIds', 'audioAssetId', 'captionTrack'] as const;
+const TIMELINE_PLAN_KEYS = ['schemaVersion', 'id', 'durationMs', 'segments'] as const;
 
 const isClipReference = (value: unknown): value is ClipReference => {
   if (!isRecord(value) || typeof value.kind !== 'string') return false;
@@ -90,3 +99,52 @@ export const validateTimeline = (value: unknown): {readonly valid: true} | {read
 
 export const deterministicTrackId = (track: Omit<TimelineTrack, 'id'>): string => deterministicId('track', track);
 export const deterministicClipId = (clip: Omit<TimelineClip, 'id'>): string => deterministicId('clip', clip);
+
+export const isTimelineSegment = (value: unknown): value is TimelineSegment => {
+  if (!isRecord(value) || !hasOnlyKeys(value, SEGMENT_KEYS)) return false;
+  if (value.schemaVersion !== 1 || typeof value.id !== 'string' || !segmentId.test(value.id)) return false;
+
+  const {assetIds, audioAssetId, captionTrack, endMs, startMs} = value;
+
+  if (typeof startMs !== 'number' || !Number.isFinite(startMs) || startMs < 0) return false;
+  if (typeof endMs !== 'number' || !Number.isFinite(endMs) || endMs <= startMs) return false;
+  if (!Array.isArray(assetIds)) return false;
+  if (!assetIds.every((asset) => typeof asset === 'string' && assetId.test(asset))) return false;
+  if (new Set(assetIds).size !== assetIds.length) return false;
+  if (audioAssetId !== undefined && (typeof audioAssetId !== 'string' || !assetId.test(audioAssetId))) return false;
+  if (captionTrack === undefined) return true;
+  if (!isValidCaptionTrack(captionTrack)) return false;
+  return !captionTrack.timings.some(
+    (timing) => timing.startMs < startMs || timing.endMs > endMs,
+  );
+};
+
+export const isTimelinePlan = (value: unknown): value is TimelinePlan => {
+  if (!isRecord(value) || !hasOnlyKeys(value, TIMELINE_PLAN_KEYS)) return false;
+  if (value.schemaVersion !== 1 || typeof value.id !== 'string' || !timelinePlanId.test(value.id)) return false;
+  if (typeof value.durationMs !== 'number' || !Number.isFinite(value.durationMs) || value.durationMs <= 0) return false;
+  if (!Array.isArray(value.segments) || value.segments.length === 0) return false;
+  if (!value.segments.every(isTimelineSegment)) return false;
+
+  const segments = [...value.segments].sort((a, b) => a.startMs - b.startMs || a.id.localeCompare(b.id));
+  if (segments.some((segment, index) => index > 0 && segment.startMs < segments[index - 1].endMs)) return false;
+
+  const expected = buildTimeline({
+    schemaVersion: 1,
+    segments: segments.map(({id: _id, ...segment}) => segment),
+  });
+  if (expected.id !== value.id || expected.durationMs !== value.durationMs) return false;
+  return expected.segments.every((segment, index) => segment.id === segments[index].id);
+};
+
+export const validateTimelinePlan = (value: unknown): {readonly valid: true} | {readonly valid: false; readonly issues: readonly string[]} => {
+  if (isTimelinePlan(value)) return {valid: true};
+  if (!isRecord(value)) return {valid: false, issues: ['timeline plan must be an object']};
+  const issues: string[] = [];
+  if (value.schemaVersion !== 1) issues.push('schemaVersion must be 1');
+  if (typeof value.id !== 'string' || !timelinePlanId.test(value.id)) issues.push('id is invalid');
+  if (typeof value.durationMs !== 'number' || !Number.isFinite(value.durationMs) || value.durationMs <= 0) issues.push('durationMs must be a positive finite number');
+  if (!Array.isArray(value.segments)) issues.push('segments must be an array');
+  if (Array.isArray(value.segments) && value.segments.some((segment) => !isTimelineSegment(segment))) issues.push('segments contain an invalid segment');
+  return {valid: false, issues};
+};

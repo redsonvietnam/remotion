@@ -1,8 +1,11 @@
 import type {AssetId} from '../foundation/types';
+import type {CaptionTrack} from '../captions/types';
 
 export type TimelineId = string & {readonly __brand: 'TimelineId'};
 export type TrackId = string & {readonly __brand: 'TrackId'};
 export type ClipId = string & {readonly __brand: 'ClipId'};
+export type TimelinePlanId = string & {readonly __brand: 'TimelinePlanId'};
+export type TimelineSegmentId = string & {readonly __brand: 'TimelineSegmentId'};
 
 export type TrackKind = 'visual' | 'narration' | 'music' | 'sfx' | 'captions' | 'effects' | 'text';
 export type ClipRole = 'visual' | 'audio' | 'text';
@@ -43,6 +46,30 @@ export type TimelineDraft = Omit<Timeline, 'id' | 'tracks'> & {
     readonly id?: TrackId;
     readonly clips: readonly Omit<TimelineClip, 'id'>[];
   })[];
+};
+
+export type TimelineSegment = {
+  readonly schemaVersion: 1;
+  readonly id: TimelineSegmentId;
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly assetIds: readonly AssetId[];
+  readonly audioAssetId?: AssetId;
+  readonly captionTrack?: CaptionTrack;
+};
+
+export type TimelineSegmentDraft = Omit<TimelineSegment, 'id'>;
+
+export type TimelinePlan = {
+  readonly schemaVersion: 1;
+  readonly id: TimelinePlanId;
+  readonly durationMs: number;
+  readonly segments: readonly TimelineSegment[];
+};
+
+export type TimelinePlanDraft = {
+  readonly schemaVersion: 1;
+  readonly segments: readonly TimelineSegmentDraft[];
 };
 
 export type TimelineValidationIssue = {
